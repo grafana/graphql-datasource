@@ -12,8 +12,8 @@
   "license": "Apache-2.0",
   "devDependencies": {
     "@grafana/data": "latest",
-    "@grafana/toolkit": "latest",
     "@grafana/runtime": "latest",
+    "@grafana/toolkit": "latest",
     "@grafana/ui": "latest",
     "@types/lodash": "latest"
   },
@@ -22,5 +22,9 @@
   },
   "resolutions": {
     "rxjs": "6.6.3"
+  },
+  "dependencies": {
+    "graphiql": "^1.0.6",
+    "graphql": "^15.4.0"
   }
 }

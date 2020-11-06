@@ -1,49 +1,43 @@
-import defaults from 'lodash/defaults';
+import React, { PureComponent } from 'react';
 
-import React, { ChangeEvent, PureComponent } from 'react';
-import { LegacyForms } from '@grafana/ui';
 import { QueryEditorProps } from '@grafana/data';
 import { DataSource } from './DataSource';
-import { defaultQuery, MyDataSourceOptions, MyQuery } from './types';
+import { MyDataSourceOptions, MyQuery } from './types';
 
-const { FormField } = LegacyForms;
+import GraphiQL from 'graphiql';
+import 'graphiql/graphiql.min.css';
+import { FetcherParams } from 'graphiql/dist/components/GraphiQL';
 
 type Props = QueryEditorProps<DataSource, MyQuery, MyDataSourceOptions>;
 
 export class QueryEditor extends PureComponent<Props> {
-  onQueryTextChange = (event: ChangeEvent<HTMLInputElement>) => {
-    const { onChange, query } = this.props;
-    onChange({ ...query, queryText: event.target.value });
-  };
+  async getData(graphQLParams: FetcherParams) {
+    const response = await fetch(
+      'https://countries.trevorblades.com/',
+      {
+        method: 'POST',
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(graphQLParams),
+        credentials: 'same-origin',
+      }
+    );
 
-  onConstantChange = (event: ChangeEvent<HTMLInputElement>) => {
-    const { onChange, query, onRunQuery } = this.props;
-    onChange({ ...query, constant: parseFloat(event.target.value) });
-    // executes the query
-    onRunQuery();
-  };
+    const queryResults = await response.json().catch(() => response.text());
+
+    return queryResults;
+  }
 
   render() {
-    const query = defaults(this.props.query, defaultQuery);
-    const { queryText, constant } = query;
+    const divStyle = {
+      height: '100vh',
+    };
 
     return (
-      <div className="gf-form">
-        <FormField
-          width={4}
-          value={constant}
-          onChange={this.onConstantChange}
-          label="Constant"
-          type="number"
-          step="0.1"
-        />
-        <FormField
-          labelWidth={8}
-          value={queryText || ''}
-          onChange={this.onQueryTextChange}
-          label="Query Text"
-          tooltip="Not used yet"
-        />
+      <div style={divStyle}>
+        <GraphiQL fetcher={this.getData} />
       </div>
     );
   }
