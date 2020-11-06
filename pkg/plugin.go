@@ -3,15 +3,15 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"math/rand"
+	"io/ioutil"
 	"net/http"
+	"net/url"
 	"time"
 
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
 	"github.com/grafana/grafana-plugin-sdk-go/backend/datasource"
 	"github.com/grafana/grafana-plugin-sdk-go/backend/instancemgmt"
-	"github.com/grafana/grafana-plugin-sdk-go/backend/log"
-	"github.com/grafana/grafana-plugin-sdk-go/data"
+	glog "github.com/grafana/grafana-plugin-sdk-go/backend/log"
 )
 
 // newDatasource returns datasource.ServeOpts.
@@ -20,6 +20,7 @@ func newDatasource() datasource.ServeOpts {
 	// into `NewInstanceManger` is called when the instance is created
 	// for the first time or when a datasource configuration changed.
 	im := datasource.NewInstanceManager(newDataSourceInstance)
+
 	ds := &SampleDatasource{
 		im: im,
 	}
@@ -44,15 +45,21 @@ type SampleDatasource struct {
 // The QueryDataResponse contains a map of RefID to the response for each query, and each response
 // contains Frames ([]*Frame).
 func (td *SampleDatasource) QueryData(ctx context.Context, req *backend.QueryDataRequest) (*backend.QueryDataResponse, error) {
-	log.DefaultLogger.Info("QueryData", "request", req)
+	glog.DefaultLogger.Info("QueryData", "request", req)
+
+	h, err := td.im.Get(req.PluginContext)
+	if err != nil {
+		return nil, err
+	}
+
+	settings := h.(*instanceSettings)
 
 	// create response struct
 	response := backend.NewQueryDataResponse()
 
 	// loop over queries and execute them individually.
 	for _, q := range req.Queries {
-		res := td.query(ctx, q)
-
+		res := td.query(ctx, settings, q)
 		// save the response in a hashmap
 		// based on with RefID as identifier
 		response.Responses[q.RefID] = res
@@ -61,43 +68,66 @@ func (td *SampleDatasource) QueryData(ctx context.Context, req *backend.QueryDat
 	return response, nil
 }
 
-type queryModel struct {
-	Format string `json:"format"`
-}
+func (td *SampleDatasource) query(ctx context.Context, settings *instanceSettings, query backend.DataQuery) backend.DataResponse {
+	// Parse query from JSON
+	q := &Query{}
 
-func (td *SampleDatasource) query(ctx context.Context, query backend.DataQuery) backend.DataResponse {
-	// Unmarshal the json into our queryModel
-	var qm queryModel
+	if err := json.Unmarshal(query.JSON, q); err != nil {
+		return backend.DataResponse{
+			Error: err,
+		}
+	}
+	// Send request to GraphQL API
 
-	response := backend.DataResponse{}
-
-	response.Error = json.Unmarshal(query.JSON, &qm)
-	if response.Error != nil {
-		return response
+	u := url.Values{
+		"query": []string{q.Query},
 	}
 
-	// Log a warning if `Format` is empty.
-	if qm.Format == "" {
-		log.DefaultLogger.Warn("format is empty. defaulting to time series")
+	queryURL, err := url.Parse(settings.URL)
+	if err != nil {
+		return backend.DataResponse{
+			Error: err,
+		}
 	}
 
-	// create data frame response
-	frame := data.NewFrame("response")
+	queryURL.RawQuery = u.Encode()
 
-	// add the time dimension
-	frame.Fields = append(frame.Fields,
-		data.NewField("time", nil, []time.Time{query.TimeRange.From, query.TimeRange.To}),
-	)
+	res, err := settings.httpClient.Get(queryURL.String())
 
-	// add values
-	frame.Fields = append(frame.Fields,
-		data.NewField("values", nil, []int64{10, 20}),
-	)
+	if err != nil {
+		return backend.DataResponse{
+			Error: err,
+		}
+	}
 
-	// add the frames to the response
-	response.Frames = append(response.Frames, frame)
+	defer res.Body.Close()
 
-	return response
+	b, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		return backend.DataResponse{
+			Error: err,
+		}
+	}
+
+	dataResponse := map[string]interface{}{}
+
+	if err := json.Unmarshal(b, &dataResponse); err != nil {
+		return backend.DataResponse{
+			Error: err,
+		}
+	}
+
+	frames, err := FrameJSON(q.Query, dataResponse)
+
+	if err != nil {
+		return backend.DataResponse{
+			Error: err,
+		}
+	}
+
+	return backend.DataResponse{
+		Frames: frames,
+	}
 }
 
 // CheckHealth handles health checks sent from Grafana to the plugin.
@@ -107,11 +137,7 @@ func (td *SampleDatasource) query(ctx context.Context, query backend.DataQuery) 
 func (td *SampleDatasource) CheckHealth(ctx context.Context, req *backend.CheckHealthRequest) (*backend.CheckHealthResult, error) {
 	var status = backend.HealthStatusOk
 	var message = "Data source is working"
-
-	if rand.Int()%2 == 0 {
-		status = backend.HealthStatusError
-		message = "randomized error"
-	}
+	glog.DefaultLogger.Info("CheckHealth", "request", req)
 
 	return &backend.CheckHealthResult{
 		Status:  status,
@@ -120,12 +146,16 @@ func (td *SampleDatasource) CheckHealth(ctx context.Context, req *backend.CheckH
 }
 
 type instanceSettings struct {
+	backend.DataSourceInstanceSettings
 	httpClient *http.Client
 }
 
 func newDataSourceInstance(setting backend.DataSourceInstanceSettings) (instancemgmt.Instance, error) {
 	return &instanceSettings{
-		httpClient: &http.Client{},
+		DataSourceInstanceSettings: setting,
+		httpClient: &http.Client{
+			Timeout: 5 * time.Minute,
+		},
 	}, nil
 }
 
