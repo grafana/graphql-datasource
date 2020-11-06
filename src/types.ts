@@ -1,7 +1,13 @@
 import { DataQuery, DataSourceJsonData } from '@grafana/data';
 
+export interface jqField {
+  name: string;
+  jq: string;
+}
+
 export interface MyQuery extends DataQuery {
   query: string;
+  fields?: jqField[];
 }
 
 /**

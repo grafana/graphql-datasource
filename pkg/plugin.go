@@ -117,7 +117,7 @@ func (td *SampleDatasource) query(ctx context.Context, settings *instanceSetting
 		}
 	}
 
-	frames, err := FrameJSON(q.Query, dataResponse)
+	frames, err := FrameJSON(q, dataResponse)
 
 	if err != nil {
 		return backend.DataResponse{
