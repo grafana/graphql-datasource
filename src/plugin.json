@@ -1,12 +1,13 @@
 {
   "type": "datasource",
-  "name": "graphql-datasource",
+  "name": "GraphQL",
   "id": "grafana-graphql-datasource",
+  "executable": "gpx_graphql",
   "metrics": true,
   "backend": true,
-  "executable": "gpx_graphql-datasource",
+  "annotations": true,
   "info": {
-    "description": "",
+    "description": "API Query Language",
     "author": {
       "name": "Grafana Labs",
       "url": "https://grafana.com"
@@ -15,17 +16,13 @@
       "graphql"
     ],
     "logos": {
-      "small": "img/logo.svg",
-      "large": "img/logo.svg"
+      "small": "img/graphql.svg",
+      "large": "img/graphql.svg"
     },
     "links": [
       {
         "name": "Website",
-        "url": "https://github.com/grafana/simple-datasource-backend"
-      },
-      {
-        "name": "License",
-        "url": "https://github.com/grafana/simple-datasource-backend/blob/master/LICENSE"
+        "url": "https://github.com/grafana/graphql-datasource"
       }
     ],
     "screenshots": [],
@@ -33,7 +30,7 @@
     "updated": "%TODAY%"
   },
   "dependencies": {
-    "grafanaVersion": "7.x.x",
+    "grafanaVersion": "7.1.x",
     "plugins": []
   }
 }

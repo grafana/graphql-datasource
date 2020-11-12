@@ -1,9 +1,12 @@
 import { DataSourceInstanceSettings } from '@grafana/data';
 import { DataSourceWithBackend } from '@grafana/runtime';
-import { MyDataSourceOptions, MyQuery } from './types';
+import { MyDataSourceOptions, GrapQLQuery } from './types';
 
-export class DataSource extends DataSourceWithBackend<MyQuery, MyDataSourceOptions> {
+export class DataSource extends DataSourceWithBackend<GrapQLQuery, MyDataSourceOptions> {
   constructor(instanceSettings: DataSourceInstanceSettings<MyDataSourceOptions>) {
     super(instanceSettings);
   }
+
+  // Enables an out-of-the-box annotaiton editor
+  annotations = {};
 }
